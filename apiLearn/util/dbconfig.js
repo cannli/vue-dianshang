@@ -26,5 +26,30 @@ module.exports  = {
             // 释放连接
             conn.release()
         })
+    },
+
+    //promise 回调
+    SySqlConnect:function(sySql,sqlArr){
+        return new Promise((resolve,reject)=>{
+            var pool = mysql.createPool(this.config);
+            pool.getConnection(function(err,conn){
+                console.log('123');
+                if(err){
+                    reject(err);
+                }else{
+                    conn.query(sySql,sqlArr,(err,data)=>{
+                        if(err){
+                            reject(err)
+                        }else{
+                            resolve(data);
+                        }
+                        conn.release();
+                    });
+                }
+
+            })
+        }).catch((err)=>{
+            console.log(err);
+        })
     }
 }
