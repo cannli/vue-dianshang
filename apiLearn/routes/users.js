@@ -6,4 +6,5 @@ var user = require('../controllers/userController')
 router.post('/sendCode', user.sendCode)
 router.post('/codePhoneLogin', user.codePhoneLogin)
 router.post('/sendCoreCode', user.sendCoreCode)
+router.post('/login', user.login)
 module.exports = router;
