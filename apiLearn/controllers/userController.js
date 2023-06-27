@@ -1,6 +1,7 @@
 const Core = require('@alicloud/pop-core')
 const config = require('../util/aliconfig')
 const dbConfig = require('../util/dbconfig');
+let fs = require('fs');
 // 配置
 let client = new Core(config.alicloud)
 const requestOption = {
@@ -10,6 +11,7 @@ const requestOption = {
 function rand(min, max) {
     return Math.floor(Math.random() * (max - min)) + min
 }
+
 validatePhoneCode = []
 let sendCodeP = (phone) => {
     for (const x of validatePhoneCode) {
@@ -42,9 +44,9 @@ sendCode = (req, res) => {
         phone,
         code
     })
-    console.log(validatePhoneCode, 7777)
     res.send({
         code: 200,
+        data: code,
         msg: '发送成功'
     })
     console.log(code)
@@ -261,32 +263,32 @@ let login = (req, res) => {
     }
 }
 //查看用户是否有详情信息
-let finUserInfo = async (user_id)=>{
+let finUserInfo = async (user_id) => {
     let sql = `select * from userinfo where user_id=?`;
     let sqlArr = [user_id];
-    let res = await dbConfig.SySqlConnect(sql,sqlArr);
-    if(res.length){
+    let res = await dbConfig.SySqlConnect(sql, sqlArr);
+    if (res.length) {
         return true;
     }
     return false;
 }
 //修改用户详细信息
-let setUserInfo = async (user_id,age,sex,job,path,birthday)=>{
-    if(finUserInfo(user_id)){
+let setUserInfo = async (user_id, age, sex, job, path, birthday) => {
+    if (finUserInfo(user_id)) {
         let sql = `update userinfo  set age=?,sex=?,job=?,path=?,birthday=? where user_id=? `;
-        let sqlArr = [age,sex,job,path,birthday,user_id]
-        let res = await dbConfig.SySqlConnect(sql,sqlArr);
-        if(res.affectedRows == 1){
+        let sqlArr = [age, sex, job, path, birthday, user_id]
+        let res = await dbConfig.SySqlConnect(sql, sqlArr);
+        if (res.affectedRows == 1) {
             let user = await getUser(user_id);
             let userinfo = await getUserInfo(user_id);
             user[0].userinfo = userinfo[0];
             return user;
         }
-    }else{
+    } else {
         let sql = `insert into userinfo (user_id,age,sex,job,path,birthday) values(?,?,?,?,?,?)`;
-        let sqlArr = [user_id,age,sex,job,path,birthday];
-        let res = await dbConfig.SySqlConnect(sql,sqlArr);
-        if(res.affectedRows == 1){
+        let sqlArr = [user_id, age, sex, job, path, birthday];
+        let res = await dbConfig.SySqlConnect(sql, sqlArr);
+        if (res.affectedRows == 1) {
             let user = await getUser(user_id);
             let userinfo = await getUserInfo(user_id);
             user[0].userinfo = userinfo[0];
@@ -295,37 +297,206 @@ let setUserInfo = async (user_id,age,sex,job,path,birthday)=>{
     }
 }
 //修改用户名称
-let setUserName = async (user_id,username)=>{
+let setUserName = async (user_id, username) => {
     let sql = `update user set username=? where id=?`;
-    let sqlArr = [username,user_id];
-    let res = await dbConfig.SySqlConnect(sql,sqlArr);
-    if(res.affectedRows==1){
+    let sqlArr = [username, user_id];
+    let res = await dbConfig.SySqlConnect(sql, sqlArr);
+    if (res.affectedRows == 1) {
         return true;
-    }else{
+    } else {
         return false;
     }
 }
 //修改资料
-let editUserInfo = async (req,res)=>{
-    let{user_id,username,age,sex,job,path,birthday} = req.query;
-    let result = await setUserName(user_id,username);
-    if(result){
-        let data = await setUserInfo(user_id,age,sex,job,path,birthday);
-        if(data.length){
+let editUserInfo = async (req, res) => {
+    let {user_id, username, age, sex, job, path, birthday} = req.query;
+    let result = await setUserName(user_id, username);
+    if (result) {
+        let data = await setUserInfo(user_id, age, sex, job, path, birthday);
+        if (data.length) {
             res.send({
-                code:200,
-                data:data[0]
+                code: 200,
+                data: data[0]
             })
-        }else{
+        } else {
             res.send({
-                code:400,
-                msg:'修改失败'
+                code: 400,
+                msg: '修改失败'
             })
         }
-    }else{
+    } else {
         res.send({
-            code:400,
-            msg:'修改失败'
+            code: 400,
+            msg: '修改失败'
+        })
+    }
+}
+
+//检查用户密码
+let checkUserPwd = async (user_id) => {
+    let sql = `select password from user where id=?`;
+    let sqlArr = [user_id];
+    let res = await dbConfig.SySqlConnect(sql, sqlArr);
+    console.log(res[0].password)
+    if (res.length) {
+        return res[0].password;
+    } else {
+        return 0;
+    }
+}
+//修改用户密码
+let setPassword = async (req, res) => {
+    let {user_id, oldpassword, newpassword} = req.query;
+    let userPwd = await checkUserPwd(user_id);
+    if (userPwd) {
+        console.log(userPwd, oldpassword)
+        if (userPwd == oldpassword) {
+            let sql = `update user set password=? where id=?`;
+            let sqlArr = [newpassword, user_id];
+            let result = await dbConfig.SySqlConnect(sql, sqlArr);
+            if (result.affectedRows) {
+                res.send({
+                    code: 200,
+                    msg: '修改密码成功！'
+                })
+            } else {
+                res.send({
+                    code: 400,
+                    msg: '修改密码失败！'
+                })
+            }
+        } else {
+            res.send({
+                code: 400,
+                msg: '原密码输入错误！'
+            })
+        }
+    } else {
+        let sql = `update user set password=? where id=?`;
+        let sqlArr = [newpassword, user_id];
+        let result = await dbConfig.SySqlConnect(sql, sqlArr);
+        if (result.affectedRows) {
+            res.send({
+                code: 200,
+                msg: '修改密码成功！'
+            })
+        } else {
+            res.send({
+                code: 400,
+                msg: '修改密码失败！'
+            })
+        }
+    }
+}
+//绑定用户邮箱接口
+let bindEmail = async (req, res) => {
+    let {user_id, email} = req.query;
+    let sql = `update user set email=? where id=?`;
+    let sqlArr = [email, user_id];
+    let result = await dbConfig.SySqlConnect(sql, sqlArr);
+    console.log(result);
+    if (result.affectedRows == 1) {
+        res.send({
+            code: 200,
+            msg: '邮箱绑定成功'
+        })
+    } else {
+        res.send({
+            code: 400,
+            msg: '邮箱绑定失败'
+        })
+    }
+}
+
+//退出
+let logout = (req, res) => {
+    res.send({
+        code: 200,
+        msg: '退出登录'
+    })
+}
+
+//图片上传
+let editUserImg = (req, res) => {
+    if (req.file.length === 0) {
+        res.render('error', {message: '上传文件不能为空！'});
+    } else {
+        let file = req.file;
+        console.log(file);
+        fs.renameSync('./public/uploads/' + file.filename, './public/uploads/' + file.originalname);
+        res.set({
+            'content-type': 'application/JSON; charset=utf-8'
+        })
+        let {user_id} = req.query;
+        let imgUrl = 'http://localhost:3000/public/uploads/' + file.originalname;
+        let sql = `update user set userpic=? where id=?`;
+        let sqlArr = [imgUrl, user_id];
+        dbConfig.sqlConnect(sql, sqlArr, (err, data) => {
+            if (err) {
+                console.log(err);
+                throw '出错了';
+            } else {
+                if (data.affectedRows == 1) {
+                    res.send({
+                        code: 200,
+                        msg: '修改成功',
+                        url: imgUrl
+                    })
+                } else {
+                    res.send({
+                        code: 400,
+                        msg: '修改失败'
+                    })
+                }
+            }
+        })
+    }
+
+}
+
+//批量多图上传
+let uploadMoreImg = (req, res) => {
+    console.log('------------------------')
+    if (req.files.length === 0) {
+        res.render('error', {message: '上传文件不能为空！'});
+    } else {
+        let sql = `insert into image (url,create_time,user_id) values `;
+        let sqlArr = [];
+        for (var i in req.files) {
+            res.set({
+                'content-type': 'application/json; charset=utf8'
+            });
+            let file = req.files[i];
+            fs.renameSync('./public/uploads/' + file.filename, './public/uploads/' + file.originalname);
+            let {user_id} = req.query;
+            let url = 'http://localhost:3000/uploads/' + file.originalname;
+            if (req.files.length - 1 == i) {
+                sql += '(?)'
+            } else {
+                sql += '(?),'
+            }
+            console.log(sql);
+            sqlArr.push([url, (new Date().valueOf()), user_id])
+        }
+        //批量存储到数据库
+        dbConfig.sqlConnect(sql, sqlArr, (err, data) => {
+            if (err) {
+                console.log(err);
+            } else {
+                console.log(data.affectedRows);
+                if (data.affectedRows > 0) {
+                    res.send({
+                        code: 200,
+                        affectedRows: data.affectedRows,
+                        msg: '上传成功'
+                    });
+                } else {
+                    res.send({
+                        code: 400,
+                        msg: '上传失败'
+                    });
+                }
+            }
         })
     }
 }
@@ -333,5 +504,12 @@ module.exports = {
     sendCode,
     codePhoneLogin,
     sendCoreCode,
-    login
+    login,
+    editUserInfo,
+    setPassword,
+    bindEmail,
+    logout,
+    editUserImg,
+    uploadMoreImg,
+    setUserName
 }
